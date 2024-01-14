@@ -1,0 +1,699 @@
+!+	0.INICIALIZAÇÃO DO ANSYS
+
+FINISH                                                                         ! encerra eventuais processos anteriores
+/CLEAR                                                                         ! limpa declaração de eventuais variáveis existentes
+/UDOC,1,DATE,0,                                                                ! suprime informação de versão do software e data das imagens que forem geradas
+/RGB,INDEX,100,100,100,0                                                       ! define o fundo branco para a imagem a ser gerada
+/RGB,INDEX,0,0,0,15                                                            ! define os textos como pretos, para contrastar
+
+!-
+!+	1.DADOS DE ENTRADA
+!+		1.0 PRELIMINARES
+LINHAS = 31                                                                    ! define a quantidade de linhas do array "_MODELDATA"
+COLUNAS = 1                                                                    ! define a quantidade de colunas do array "_MODELDATA"
+PLANOS = 1                                                                     ! define a quantidade de planos do array "_MODELDATA"
+
+*DIM,_MODELDATA,array,LINHAS,COLUNAS,PLANOS,,,                                 ! define as dimensões do array "_MODELDATA", para "XX" linhas, "YY" colunas e "ZZ" planos
+*VREAD,_MODELDATA,_MODELDATA,txt,,,,,,                                         ! lê o .txt com os dados de entrada
+(1F9.0)                                                                        ! necessário para informar o formato dos núm. lidos: 1 linha de cada vez, 9 casas decimais e sem definição da posição do separador decimal
+
+GRAVIDADE = 9.81                                                               ! [m/s²] aceleração da gravidade
+!-
+!+		1.1 SOLO
+
+SuMAX        = _MODELDATA(1)                                                   ! [kN/m²] resistência não-drenada do solo na profundidade máxima modelada
+Beta         = _MODELDATA(2)                                                   ! [-] parâmetro de rigidez do solo
+EsoloMAX     = Beta*SuMAX                                                      ! [kN/m²] módulo de elasticidade do solo na profundidade máxima modelada
+NUsolo       = _MODELDATA(3)                                                   ! [-] coef. de Poisson do solo
+GAMMAsolo    = _MODELDATA(4)                                                   ! [kN/m³] peso específico saturado do solo
+CsoloMAX     = _MODELDATA(5)                                                   ! [kN/m²] coesão do solo na profundidade máxima modelada
+ATRIsolo     = ((_MODELDATA(6))*3.14159/180)                                   ! [rad] ângulo de atrito do solo
+DILAsolo     = ((_MODELDATA(7))*3.14159/180)                                   ! [rad] ângulo de dilatação do solo
+Ko           = _MODELDATA(8)                                                   ! [-] coef. de empuxo do solo em repouso
+
+! Os parâmetros abaixo são atribuídos para a aplicação do critério de Drucker-Prager Estendido (EDP) no ANSYS
+alphaps      = (6*sin(ATRIsolo))/(3-sin(ATRIsolo))                             ! [-] parâmetro de sensibilidade à pressão, utilizado para critério de escoamento
+alphabarraps = alphaps                                                         ! [-] parâmetro de sensibilidade à pressão, utilizado para potencial plástico
+SescMAX      = (6*CsoloMAX*cos(ATRIsolo))/((3-sin(ATRIsolo)))                  ! [kN/m²] tensão de escoamento unixial na profundidade máxima modelada
+
+! Os parâmetros abaixo servem para controlar a variação do módulo de elasticidade e da tensão de escoamento ao longo da profundidade (em termos percentuais)
+Esoloini     = _MODELDATA (9)
+Sescini      = _MODELDATA (10)
+
+!-
+!+		1.2 LINHA
+
+Dlinha       = _MODELDATA(11)                                                ! [m] diâmetro equivalente da linha de ancoragem, considerando condição de simetria
+Alinha       = (((3.14159)*(Dlinha)**2)/4)/2                                   ! [m²] área da seção transversal equivalente da linha de ancoragem
+Elinha       = _MODELDATA(12)                                                  ! [kN/m²] módulo de elasticidade da linha de ancoragem
+NUlinha      = _MODELDATA(13)                                                  ! [-] coef. de Poisson da linha de ancoragem
+GAMMAlinha   = _MODELDATA(14)                                                  ! [kN/m³] peso específico do aço
+
+!-
+!+		1.3 INTERFACE SOLO-CORRENTE
+
+FRIC         = _MODELDATA(15)                                                  ! [-] coeficiente de atrito na interface solo-corrente
+FKN          = _MODELDATA(16)                                                  ! [kN/m³] fator de rigidez normal 
+FKT          = _MODELDATA(17)                                                  ! [kN/m³] fator de rigidez tangencial
+
+!-
+!+		1.4 PARÂMETROS DE MALHA
+
+discretsolo  = _MODELDATA(18)                                                  ! define o tamanho dos elementos que comporão a linha de ancoragem e, consequentemente, os contatos
+discretlinha = _MODELDATA(19)                                                  ! define o tamanho dos elementos que comporão o maciço de solo e, consequentemente, os alvos
+
+!-
+!+		1.5 GEOMETRIA
+!+			1.5.1 LEITURA DAS COORDENADAS DA CORRENTE
+
+npontos      = _MODELDATA(20)                                                  ! define núm. pontos utilizado na geração das coordenadas da catenária inversa
+
+*DIM,_XDATA,array,npontos,1                                                    ! define as dimensões do array que contém as coordenadas horizontais da catenária inversa
+*VREAD, _XDATA, _XDATA,txt                                                     ! lê o .txt com as coordenadas horizontais da catenária inversa
+(1F9.0)                                                                        ! necessário para informar o formato dos núm. lidos: 1 linha de cada vez, 9 casas decimais e sem definição da posição do separador decimal
+
+*DIM,_YDATA,array,npontos,1                                                    ! define as dimensões do array que contém as coordenadas verticais da catenária inversa
+*VREAD, _YDATA, _YDATA,txt                                                     ! lê o .txt com as coordenadas verticais da catenária inversa   
+  (1F9.0)                                                                      ! necessário para informar o formato dos núm. lidos: 1 linha de cada vez, 9 casas decimais e sem definição da posição do separador decimal
+
+!-
+!+			1.5.2 DEFINIÇÃO DAS DIMENSÕES DO MACIÇO DE SOLO
+
+Xmac1         = _MODELDATA(21)                                                 ! define a coordenada X inicial para o maciço de solo ("1º vértice")
+Xmac2         = _MODELDATA(22)                                                 ! define a coordenada X final para o maciço de solo ("2º vértice")
+Ymac1         = _MODELDATA(23)                                                 ! define a coordenada Y inicial para o maciço de solo ("1º vértice")
+Ymac2         = _MODELDATA(24)                                                 ! define a coordenada Y final para o maciço de solo ("2º vértice")
+Zmac1         = _MODELDATA(25)                                                 ! define a coordenada Z inicial para o maciço de solo ("1º vértice")
+Zmac2         = _MODELDATA(26)                                                 ! define a coordenada Z final para o maciço de solo ("2º vértice")
+
+!-
+!+			1.5.3 DESLOCAMENTO DA EXTREMIDADE FIXADA DA LINHA
+
+DESLOCAx      = _MODELDATA(27)                                                 ! define o deslocamento X a ser incorporado na extremidade fixa da linha de ancoragem, par afastar condições de contorno
+DESLOCAy      = _MODELDATA(28)                                                 ! define o deslocamento Y a ser incorporado na extremidade fixa da linha de ancoragem, par afastar condições de contorno
+
+!-
+!+		1.6 CARGAS OU DESLOCAMENTOS APLICADOS
+
+Hagua         = _MODELDATA(29)                                                 ! [m] altura da coluna d'água acima do leito marinho
+
+! Permite que seja aplicado força ou deslocamento, de acordo com a característica do problema
+Flinha        = _MODELDATA(30)                                                 ! [kN] amplitude da força aplicada na linha
+Daplic        = _MODELDATA(30)                                                 ! [m] deslocamento aplicado na extremidade da linha
+
+! Sequência para determinar o ângulo de aplicação de carga, alinhado ao último segmento de linha
+HIPOTENUSA    = ((_XDATA(npontos)-_XDATA(npontos-1))**2+((_YDATA(npontos)-_YDATA(npontos-1))**2))**.5
+CATETOADJ     = _XDATA(npontos)-_XDATA(npontos-1)
+CATETOOPO     = _YDATA(npontos)-_YDATA(npontos-1)
+TANGANG       = CATETOOPO/CATETOADJ
+
+Fang = atan(TANGANG)                                                           ! [rad] ângulo de aplicação da força
+Fhoriz        = Flinha*cos(Fang)                                               ! [kN] componente x de força na linha
+Fvert         = Flinha*sin(Fang)                                               ! [kN] componente y de força na linha
+divtime       = _MODELDATA(31)                                                 ! [-] número de parcelas de carga ou deslocamento a serem aplicadas até chegar ao total
+
+!-
+!-
+!-
+!+	2.ETAPA DE PRÉ-PROCESSAMENTO
+!+		2.0 PRELIMINARES
+/PREP7                                                                         ! inicia o pré-processador
+!-
+!+		2.1 MODELO GEOMÉTRICO DOS ELEMENTO
+!+			2.1.1 CORRENTE
+
+ALLSEL,ALL
+ *DO,i,1,(npontos),1                                                           ! loop para lançar os KEYPOINTS da linha
+ K,,_XDATA(i),_YDATA(i),Zmac2/2
+ *ENDDO
+
+ALLSEL,ALL
+ *DO,i,1,(npontos-1),1                                                         ! loop para lançar as LINES da linha
+ L,i,i+1
+ *ENDDO
+
+! Cria um grupo com todas as LINES que representam a linha para procedimentos posteriores
+ALLSEL,ALL
+ LSEL,ALL
+ CM,'LINHASCAT',LINE                                                           
+
+ALLSEL,ALL
+ CMSEL,R,'LINHASCAT',LINE                                                      ! seleciona as LINES que representam a linha
+ LGEN, ,ALL, , ,DESLOCAx,DESLOCAy, , , ,1                                      ! desloca a linha como um todo, para afastar os efeitos das condições de contorno
+
+!-
+!+			2.1.2 SOLO
+
+! Criação de um parâmetro para particionamento vertical do solo, que permite a variação de valores como módulo de elasticidade e tensão de escoamento de acordo com a coordenada Y
+DIVy = (Ymac2)/(discretsolo)
+
+*DO,i,1,DIVy,1                                                                 ! inicia loop para lançar os VOLUMES de solo
+ BLOCK,Xmac1,Xmac2,Ymac2*((i-1)/DIVy),Ymac2*(i/DIVy),Zmac1,Zmac2/2,              ! lança os VOLUMES de acordo com os pontos chaves definidos na entrada de dados e com o particionamento vertical
+*ENDDO                                                                         ! encerra loop para lançar VOLUMES de solo
+
+!*DO,i,1,DIVy,1                                                                 ! inicia loop para lançar os VOLUMES de solo
+! BLOCK,Xmac1,Xmac2,Ymac2*((i-1)/DIVy),Ymac2*(i/DIVy),Zmac2/2,Zmac2,              ! lança os VOLUMES de acordo com os pontos chaves definidos na entrada de dados e com o particionamento vertical
+!*ENDDO                                                                         ! encerra loop para lançar VOLUMES de solo
+
+ALLSEL,ALL
+VGLUE,ALL                                                                      ! aglutina volumes para continuidade na geração da malha
+
+!-
+!-
+!+		2.2 MODELO DE ELEMENTOS FINITOS
+!+			2.2.1 MACIÇO DE SOLO
+
+ET,1,SOLID185                                                                  ! declara o tipo de elemento finito para representar o maciço de solo
+
+*DO,i,1,DIVy,1                                                                 ! inicia loop para atribuir malha aos VOLUMES do maciço de solo
+ FATORy = (1/DIVy)*(DIVy-(i-1))                                                ! cria um multiplicador que irá atribuir gradualmente as propriedades do solo para cada particionamento ao longo de Y (baixo para cima, ou seja, do maior até o menor)
+ Esolo = (Esoloini)*EsoloMAX+(1-Esoloini)*EsoloMAX*FATORy                      ! calcula o módulo de elasticidade associado ao passo "i", do maior para o menor (região inferior para a região superior)
+ Sesc = (Sescini)*SescMAX+(1-Sescini)*SescMAX*FATORy                           ! calcula a tensão de escoamento equivalente associada ao passo "i", do maior para o menor (região inferior para a região superior)
+
+! Declaração necessária de temperatura para devido entendimento da entrada de propriedades pelo software
+ MPTEMP, , , , , , , , 
+ MPTEMP,1, 
+
+ MPDATA,EX,i, ,Esolo                                                           ! associa o módulo de elasticidade do maciço de solo
+ MPDATA,PRXY,i, ,NUsolo                                                        ! associa o coeficiente de Poisson do maciço de solo
+ MPDATA,DENS,i, ,GAMMAsolo/GRAVIDADE                                           ! associa a densidade do material ao maciço de solo
+
+ TB,EDP,i,,,LYFUN                                                              ! declara os parâmetros para função linear de escoamento (plastificação)
+ TBDATA,1,alphaps,Sesc                                                         ! parâmetro "alphaps" constante (definição inicial), parâmetro Sesc varia para cada divisão "i"
+
+ TB,EDP,i,,,LFPOT                                                              ! declara o parãmetro para função linear de potencial plástico
+ TBDATA,1,alphabarraps                                                         ! parâmetro "alphabarraps" constante (definição inicial)
+
+ ALLSEL,ALL
+ VSEL,R,LOC,Y,(i-1)*(Ymac2/DIVy),(i)*(Ymac2/DIVy)                              ! faz a seleção dos volumes para cada camada de divisão estabelecidada na direção Y (eixo vertical)
+ VATT,i,i,1,                                                                   ! atribui as propriades ao volume, como material, constante real e tipo de elemento
+ ESIZE,discretsolo                                                             ! define o tamanho do elemento de acordo com o valor informado no arquivo de entrada de dados
+ MSHAPE,0,3D                                                                   ! define a malha com elementos hexaédricos 
+ MSHKEY,1                                                                      ! define malha mapeada, ou seja, utiliza como padrão o tamanho de elemento adotado anteriormente
+ VMESH,ALL                                                                     ! gera a malha para os volumes
+
+*ENDDO                                                                         ! encerra loop para atribuir malha aos VOLUMES do maciço de solo
+
+!-
+!+			2.2.2 LINHA DE ANCORAGEM
+
+MATLINHA = DIVy+1                                                              ! atribui uma variável que considera a quantidade de divisões em Y e as diferentes propriedades de camada do solo
+
+ET,2,LINK180                                                                   ! declara o tipo de elemento finito para o material "2"
+
+SECTYPE,2,LINK                                                                 ! identifica a seção "2" do tipo "LINK"
+SECDATA,Alinha                                                                 ! associa a área da linha de ancoragem
+SECCONTROL,,1                                                                  ! declara a opção de que o elemento funciona apenas a tração
+
+! Declaração necessária de temperatura para devido entendimento da entrada de propriedades pelo software
+MPTEMP, , , , , , , , 
+MPTEMP,1, 
+
+MPDATA,EX,MATLINHA,,Elinha                                                     ! associa o módulo de elasticidade da linha de ancoragem
+MPDATA,PRXY,MATLINHA,,NUlinha                                                  ! associa o coeficiente de Poisson da linha de ancoragem
+MPDATA,DENS,MATLINHA,,GAMMAlinha/GRAVIDADE                                     ! associa a densidade do material à linha de ancoragem
+
+ALLSEL,ALL
+ CMSEL,R,'LINHASCAT',LINE                                                      ! seleciona as LINES que representam a linha
+ LATT,MATLINHA, ,2, , , ,2                                                     ! atribui as propriades à linha, como material, tipo de elemento e seção transversal
+ LESIZE,ALL,discretlinha, , , , , , ,                                          ! divide as linhas em um número de elementos de acordo com a discretização do arquivo de entrada
+ LMESH,ALL                                                                     ! cria a malha para as linhas
+
+! Cria um grupo com todos os elementos que representam linha de ancoragem
+ALLSEL,ALL
+ ESEL,S,TYPE,,2
+ CM,'ELEMCAT',ELEM
+
+!-
+!+			2.2.3 INTERFACE DE CONTATO
+
+! Formato de declaração que considera a quantidade de diferentes materiais atribuídos ao solo (discretrização em Y) e o material da linha de ancoragem
+MATINTERF = MATLINHA + 1                                                       ! identifica o material a ser atribuído à interface de contato
+
+MP,MU,MATINTERF,FRIC                                                           ! estabelece o coeficiente de atrito para o nó superior
+MAT,MATINTERF                                                                  ! estabelece o material para malha
+R,MATINTERF                                                                    ! estabelece a identificação das constantes reais
+REAL,MATINTERF                                                                 !
+ET,3,TARGE170                                                                  ! declara o elemento alvo
+ET,4,CONTA175                                                                  ! declara o elemento de contato
+
+! Sequência de opções chave que podem ser alteradas no elemento de contato
+!KEYOPT,4, 1,0                                                                 ! Degrees of freedom (0: UX, UY, UZ)
+!KEYOPT,4, 2,0                                                                 ! Contact algorithm (0: Augmented Lagrangian (default))
+KEYOPT,4, 3,1                                                                  ! Contact model (0: Contact force-based model (default), 1: Contact traction-based model)
+!KEYOPT,4, 4,0                                                                 ! Contact normal direction (0: Normal to target surface (default))
+!KEYOPT,4, 5,0                                                                 ! CNOF/ICONT Automated adjustment (0: No automated adjustment, 1: Close gap with auto CNOF, 2: Reduce penetration with auto CNOF, 3: Close gap/reduce penetration with auto CNOF, 4: Auto ICONT)
+!KEYOPT,4, 6,0                                                                 ! Contact stiffness variation (0: Use default range for stiffness updating)
+!KEYOPT,4, 7,0                                                                 ! Element level time incrementation control / impact constraints (0: No control)
+!KEYOPT,4, 8,0                                                                 ! Symmetric contact behavior (0: Both symmetric pairs are active. However, each pair has its own contact characteristics)
+!KEYOPT,4, 9,0                                                                 ! Effect of initial penetration or gap (0: Include both initial geometrical penetration or gap and offset, 1: Exclude both initial geometrical penetration or gap and offset, 2: Include both initial geometrical penetration or gap and offset, but with ramped effects, 3: Include offset only (exclude initial geometrical penetration or gap), 4: Include offset only (exclude initial geometrical penetration or gap), but with ramped effects, 5: Include offset only (exclude initial geometrical penetration or gap) regardless of the initial contact status (near-field or closed), 6: Include offset only (exclude initial geometrical penetration or gap), but with ramped effects regardless of the initial contact status (near-field or closed))
+!KEYOPT,4,10,0                                                                 ! Contact Stiffness Update (0: Each iteration based on the current mean stress of underlying elements. The actual elastic slip never exceeds the maximum allowable limit (SLTO) during the entire solution.)
+!KEYOPT,4,11,0                                                                 ! Shell Thickness Effect (0: Exclude)
+KEYOPT,4,12,2                                                                  ! Behavior of contact surface (0: Standard, 1: Rough, 2: No separation (sliding permitted), 3: Bonded, 4: No separation (always), 5: Bonded (always), 6: Bonded (initial contact))
+!KEYOPT,4,15,0                                                                 ! Effect of contact stabilization damping (0: Damping is activated only in the first load step (default)
+!KEYOPT,4,16,0                                                                 ! Squeal damping controls for interpretation of real constants FDMD and FDMS (0: FDMD and FDMS are scaling factors for destabilizing and stabilizing damping (default).)
+!KEYOPT,4,18,0                                                                 ! Sliding behavior (0: Finite sliding (default). The contacting interface can undergo separation, relative large sliding, and arbitrary rotation)
+
+! Sequência de constantes reais que podem ser alteradas no elemento alvo
+RMODIF,MATINTERF, 3,FKN                                                        ! Normal penalty stiffness factor
+!RMODIF,MATINTERF, 5,-.5                                                       ! Initial contact closure
+!RMODIF,MATINTERF, 9,Su                                                        ! Maximum friction stress
+RMODIF,MATINTERF,10,1E-9                                                       ! Contact surface offset
+RMODIF,MATINTERF,12,FKT                                                        ! Tangent penalty stiffness factor
+!RMODIF,MATINTERF,13,0                                                         ! Contact cohesion
+
+ALLSEL,ALL
+ TYPE,3                                                                        ! estabelece que será utilizado o elemento finito identificado como "3" (TARGE)
+ ESEL,R,TYPE,,1                                                                ! seleciona somente os elementos de solo
+ NSLE,S,1                                                                      ! seleciona os nós dos elementos de solo
+ NSEL,R,LOC,Z,Zmac2/2                                                          ! reseleciona os nós dos elementos de solo posicionados na coordenada Ymac2 (limite do maciço)
+ ESURF                                                                         ! cria os elementos alvo com base nos elementos de solo selecionados
+
+!ALLSEL,ALL
+! TYPE,3                                                                        ! estabelece que será utilizado o elemento finito identificado como "3" (TARGE)
+! ESEL,R, TYPE,,1                                                               ! seleciona somente os elementos de solo
+! ESEL,R,CENT,Z,Zmac2/2+discretsolo/2                                           ! seleciona os elementos de solo que se encontram adjacentes ao plano da linha de ancoragem
+! ESURF                                                                         ! cria os elementos alvo com base nos elementos de solo selecionados
+
+ALLSEL,ALL
+ TYPE,4                                                                        ! estabelece que será utilizado o elemento finito identificado como "4" (CONTA)
+ CMSEL,R,'ELEMCAT',ELEM                                                        ! seleciona os elementos atribuídos para a linha de ancoragem
+ NSLE,S,1                                                                      ! seleciona os nós referentes aos elementos da linha de ancoragem
+ ESURF                                                                         ! cria os elementos de contato com base nos nós da linha de ancoragem
+
+!CNCHECK,ADJUST                                                                ! ajusta o estabelecimento do contato, retirando eventuais espaçamentos ou penetrações indesejadas
+
+!-
+!-
+!-
+!+	3.CONDIÇÕES INICIAIS
+!+		3.1 DECLARAÇÃO DAS TENSÕES PARA AS CONDIÇÕES INICIAIS DO PROBLEMA
+
+GAMMAagua = 10
+
+! Declaração das tensões para as condições iniciais do problema
+SIGMAw = GAMMAagua*Hagua                                                       ! especifica a tensão hidrostática na superfície do leito marinho, de acordo com o peso específico da água e a altura de coluna d'água
+SIGMAv = -1*(GAMMAsolo*Ymac2+SIGMAw)                                           ! especifica o valor máximo de tensão vertical para a condição inicial do problema (sinal negativo indica compressão)
+SIGMAh = SIGMAv*Ko                                                             ! especifica o valor máximo de tensão horizontal para a condição inicial do problema, de acordo com o coeficiente de empuxo ao repouso
+
+!-
+!+		3.2 ATIVAÇÃO DOS ESTADOS INICIAIS DE TENSÃO
+
+ALLSEL,ALL
+ ACEL,,GRAVIDADE,                                                              ! ativa a aceleração da gravidade, somente na direção Y
+
+ALLSEL,ALL
+ ESEL,R,TYPE,,1                                                                ! reseleciona somente os elementos de solo
+ INISTATE,SET,DATA,FUNC                                                        ! 
+ INISTATE,SET,DTYP,S                                                           !
+
+!
+ INISTATE,DEFINE,ALL,ALL,,,LINY,SIGMAh,GAMMAsolo,SIGMAv,GAMMAsolo,SIGMAh,GAMMAsolo,0,0,0
+!-
+!-
+!+	4.CONDIÇÕES DE CONTORNO
+!+		4.1 FACES EM Y (PLANO XZ)
+
+ALLSEL,ALL
+ NSEL,R,LOC,Y,Ymac1                                                            ! seleciona os nós posicionados na coordenada Ymac1 (limite do maciço)
+  D,ALL,ALL,0                                                                  ! restringe todos os graus de liberdade para os nós selecionados
+
+ALLSEL,ALL
+ ESEL,R,TYPE,,1                                                                ! seleciona somente os elementos de solo
+ NSLE,S,1                                                                      ! seleciona os nós dos elementos de solo
+ NSEL,R,LOC,Y,Ymac2                                                            ! reseleciona os nós dos elementos de solo posicionados na coordenada Ymac2 (limite do maciço)
+  SF,ALL,PRES,SIGMAw                                                           ! aplica uma pressão na superfície dos elementos (sentido negativo do eixo Y)
+
+!- 
+
+!+		4.2 FACES EM Z (PLANO XY)
+
+ALLSEL,ALL
+ NSEL,R,LOC,Z,Zmac1                                                            ! seleciona os nós posicionados na coordenada Zmac1 (limite do maciço)
+  D,ALL,ALL,0                                                                  ! restringe todos os graus de liberdade para os nós selecionados
+
+ALLSEL,ALL
+ NSEL,R,LOC,Z,Zmac2/2                                                            ! seleciona os nós posicionados na coordenada Zmac2 (limite do maciço)
+DSYM,SYMM,Z, 
+
+
+!-
+
+!+		4.3 FACES EM X (PLANO YZ)
+
+ALLSEL,ALL
+ NSEL,R,LOC,X,Xmac1                                                            ! seleciona os nós posicionados na coordenada Xmac1 (limite do maciço)
+  D,ALL,ALL,0                                                                  ! restringe todos os graus de liberdade para os nós selecionados
+
+ALLSEL,ALL
+ NSEL,R,LOC,X,Xmac2                                                            ! seleciona os nós posicionados na coordenada Xmac2 (limite do maciço)
+  D,ALL,ALL,0                                                                  ! restringe todos os graus de liberdade para os nós selecionados
+
+FINISH                                                                         ! encerra o pré-processador
+
+!-
+!-
+!+	5.ANÁLISE PARA TENSÕES INICIAIS
+
+/SOLU                                                                          ! inicia a etapa de solução
+
+!+		5.1 OPÇÕES DE ANÁLISE
+
+ALLSEL,ALL
+ ANTYPE,SOIL                                                                   ! ativa o tipo de solução para análise de solos
+ SSOPT,GEOSTATIC                                                               ! indica a opção de análise geostática (minimiza deformações iniciais)
+ NLGEOM,ON                                                                     ! indica que a análise é não-linear e admite grandes deformações
+ NROPT,FULL                                                                    ! indica integração completa por Newton-Raphson
+ PSCONTROL,ALL,ON                                                              ! indica utilização de processamento paralelo (vários núcleos)
+
+ALLSEL,ALL
+ TIME,1                                                                        ! define o passo de carga para a situação de tensões iniciais
+ DELTIM,0.01,0,.5                                                              ! passo inicial de aplicação de carga, passo mínimo de aplicação de carga, passo máximo de aplicação de carga
+ AUTOTS,ON                                                                     ! permite que o programa adpate cada passo de carga de acordo com os limites estabelecidos
+ NEQIT,100                                                                     ! estipula um número máximo de 100 iterações para busca de convergência, caso contrário admite-se que não foi encontrada solução
+ OUTRES,ERASE                                                                  ! reseta as especificações sobre dados de saída
+ OUTRES,ALL,ALL                                                                ! especifica que todos os tipos de resultados devem ser gravados nos dados de saída
+
+! Sequência de comandos que possibilita alterar os critérios de convergência para a primeira etapa de solução
+FORTOL1=1                                                                      ! define um multiplicador para ajustar o critério de convergência para força (valor unitário não impõe alterações)
+DESTOL1=1                                                                      ! define um multiplicador para ajustar o critério de convergência para deslocamento (valor unitário não impõe alterações)
+CNVTOL,F,,FORTOL1*(.005),,.01                                                  ! declara o critério de convergência para força (0.005 é o valor padrão)
+CNVTOL,U,,DESTOL1*(.05),,0                                                     ! declara o critério de convergência para deslocamento (.05 é o valor padrão)
+
+ALLSEL,ALL
+ ESEL,S,TYPE,,2                                                                ! seleciona apenas os elementos da linha de ancoragem
+ EKILL,ALL                                                                     ! desativa os elementos da linha de ancoragem
+
+ALLSEL,ALL
+ SOLVE                                                                         ! solução do modelo
+ FINISH                                                                        ! encerra a etapa de solução
+
+!-
+!-
+!+	6.ANÁLISE PARA APLICAÇÃO DE FORÇA OU DESLOCAMENTO
+
+/SOLU                                                                          ! inicia a etapa de solução
+
+!+		6.1 APLICAÇÃO DAS FORÇAS NA EXTREMIDADE SUPERIOR
+
+ALLSEL,ALL
+ ANTYPE,STATIC,RESTART,,,,,                                                    ! indica que a análise está recomeçando a partir dos resultados anteriores
+ NLGEOM,ON                                                                     ! indica que a análise é não-linear e admite grandes deformações
+ NROPT,FULL                                                                    ! indica integração completa por Newton-Raphson
+ PSCONTROL,ALL,ON                                                              ! indica utilização de processamento paralelo (vários núcleos)
+
+ALLSEL,ALL
+ ESEL,S,TYPE,,2                                                                ! seleciona apenas os elementos da linha de ancoragem
+ EALIVE,ALL                                                                    ! ativa os elementos da linha de ancoragem
+
+ALLSEL,ALL
+ CMSEL,S,'ELEMCAT',ELEM                                                        ! seleciona todos os elementos da linha de ancoragem
+ *GET,ELEMCATMIN,ELEM,,NUM,MIN                                                 ! cria um parâmetro "ELEMCATMIN" para retornar o elemento da extremidade inferior
+ ESEL,R,,,ELEMCATMIN                                                           ! seleciona o elemento da extremidade inferior
+ NSLE,S,POS,1                                                                  ! seleciona o nó que representa o apoio fixo
+ D,ALL,UX,0                                                                    ! restringe a translação da extremidade inferior na direção X
+ D,ALL,UY,0                                                                    ! restringe a translação da extremidade inferior na direção Y
+
+! Sequência de comandos para aplicação da carga em um número estipulado de divisões (permite uma melhor avaliação do que ocorre ao longo das parcelas de aplicação da carga)
+ALLSEL,ALL
+ TIME,2                                                                        ! define o passo de carga para a situação de aplicação da carga na extremidade superior
+ DELTIM,1E-12,1E-24,.1                                                          ! passo inicial de aplicação de carga, passo mínimo de aplicação de carga, passo máximo de aplicação de carga
+ AUTOTS,ON                                                                     ! permite que o programa adpate cada passo de carga de acordo com os limites estabelecidos
+ NEQIT,100                                                                     ! estipula um número máximo de 100 iterações para busca de convergência, caso contrário admite-se que não foi encontrada solução
+ OUTRES,ERASE                                                                  ! reseta as especificações sobre dados de saída
+ OUTRES,ALL,ALL                                                                ! especifica que todos os tipos de resultados devem ser gravados nos dados de saída
+
+ALLSEL,ALL
+ CMSEL,S,'ELEMCAT',ELEM                                                        ! seleciona todos os elementos da linha de ancoragem
+ *GET,ELEMCATMAX,ELEM,,NUM,MAX                                                 ! obtém o número do elemento localizado na extremidade superior
+ ESEL,R,,,ELEMCATMAX                                                           ! seleciona somente o elemento localizado na extremidade superior
+ NSLE,S,POS,2                                                                  ! seleciona o nó superior do elemento (ponto de embutimento)
+
+! Estratégia temporária, vou ver se consigo confirmar cada parcela de carga aplicada em cada divisão de tempo
+Fh = (Fhoriz/1)*(1)
+Fv = (Fvert/1)*(1)
+
+ F,ALL,FX,Fh                                                                   ! aplica a parcela de força horizontal na extremidade superior
+ F,ALL,FY,Fv                                                                   ! aplica a parcela de força vertical na extremidade superior
+
+! Sequência de comandos que possibilita alterar os critérios de convergência para a segunda etapa de solução
+FORTOL2=1                                                                      ! define um multiplicador para ajustar o critério de convergência para força (valor unitário não impõe alterações)
+DESTOL2=1                                                                      ! define um multiplicador para ajustar o critério de convergência para deslocamento (valor unitário não impõe alterações)
+CNVTOL,F,,FORTOL2*(.005),,.01                                                  ! declara o critério de convergência para força (0.005 é o valor padrão)
+CNVTOL,U,,DESTOL2*(.05),,0                                                     ! declara o critério de convergência para deslocamento (.05 é o valor padrão)
+
+ALLSEL,ALL
+ SOLVE                                                                         ! solução do modelo
+ FINISH                                                                        ! encerra a etapa de solução
+ 
+ 
+
+!-
+!-
+!+	7.ETAPA DE PÓS-PROCESSAMENTO
+!+		7.0 PRELIMINARES
+
+/POST1                                                                         ! inicia o pós-processador
+
+!-
+!+		7.1 GERAÇÃO DE IMAGENS
+
+/RGB,INDEX,100,100,100,0                                                       ! define o fundo branco para a imagem a ser gerada
+/RGB,INDEX,0,0,0,15                                                            ! define os textos como pretos, para contrastar
+/VIEW,1,1,1,1                                                                  ! define a vista como isométrica
+JPEG,QUAL,100,                                                                 ! define a qualidade do JPEG como máxima
+JPEG,ORIENT,HORIZ                                                              ! define a orientação do JPEG como horizontal
+JPEG,COLOR,2                                                                   ! define a impressão do JPEG como colorida
+JPEG,TMOD,1                                                                    ! define o formato de texto como padrão
+/GFILE,1800                                                                    !
+
+*DO,i,1,divtime+1,1                                                            ! sequência de comandos para geração de imagens em cada "passo de carga"
+
+ALLSEL,ALL
+! ESEL,U,TYPE,,2                                                                ! retira da seleção os elementos da linha de ancoragem
+ ESEL,R,CENT,Z,Zmac1,Zmac2/2                                                   ! seleciona somente a metade anterior do maciço, possibilitando ver o plano onde se localiza a catenária
+
+/EFACET,2   
+
+
+! Gera figura de deslocamentos em X em todo o modelo (NODAL SOLUTION)
+/VIEW,1,1,1,1                                                                  ! seta a vista isométrica
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLNSOL,U,X,1,                                                                  ! solução nodal, deslocamentos, direção X, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura de deslocamentos em Y em todo o modelo (NODAL SOLUTION)
+/VIEW,1,1,1,1                                                                  ! seta a vista isométrica
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLNSOL,U,Y,1,                                                                  ! solução nodal, deslocamentos, direção Y, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura de deslocamentos em Z em todo o modelo (NODAL SOLUTION)
+/VIEW,1,1,1,1                                                                  ! seta a vista isométrica
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLNSOL,U,Z,1,                                                                  ! solução nodal, deslocamentos, direção Z, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura de somatório de deslocamentos em todo o modelo (NODAL SOLUTION)
+/VIEW,1,1,1,1                                                                  ! seta a vista isométrica
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLNSOL,U,SUM,1,                                                                ! solução nodal, deslocamentos, somatório de direções, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura com tensões em X (ELEMENT SOLUTION)
+/VIEW,1, , ,1                                                                  ! seta vista no plano XY
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLESOL,S,X,1,                                                                  ! solução de elemento, tensões, direção X, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura com tensões em X (ELEMENT SOLUTION)
+/VIEW,1,1,1,1                                                                  ! seta a vista isométrica
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLESOL,S,X,1,                                                                  ! solução de elemento, tensões, direção X, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura com tensões em Y (ELEMENT SOLUTION)
+/VIEW,1, , ,1                                                                  ! seta vista no plano XY
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLESOL,S,Y,1,                                                                  ! solução de elemento, tensões, direção Y, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura com tensões em Y (ELEMENT SOLUTION)
+/VIEW,1,1,1,1                                                                  ! seta a vista isométrica
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLESOL,S,Y,1,                                                                  ! solução de elemento, tensões, direção Y, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura com tensões em Z (ELEMENT SOLUTION)
+/VIEW,1, , ,1                                                                  ! seta vista no plano XY
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLESOL,S,Z,1,                                                                  ! solução de elemento, tensões, direção Z, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura com tensões em Z (ELEMENT SOLUTION)
+/VIEW,1,1,1,1                                                                  ! seta a vista isométrica
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLESOL,S,Z,1,                                                                  ! solução de elemento, tensões, direção Z, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura com taxas de tensão (ELEMENT SOLUTION)
+/VIEW,1, , ,1                                                                  ! seta vista no plano XY
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLESOL,NL,SRAT,1,                                                              ! solução de elemento, taxa de estado de tensão, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura com taxas de tensão (NODAL SOLUTION)
+/VIEW,1, , ,1                                                                  ! seta vista no plano XY
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLNSOL,NL,SRAT,1,                                                              ! solução nodal, taxa de estado de tensão, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura com taxas de tensão (ELEMENT SOLUTION)
+/VIEW,1,1,1,1                                                                  ! seta a vista isométrica
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLESOL,NL,SRAT,1,                                                              ! solução de elemento, taxa de estado de tensão, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura com taxas de tensão (NODAL SOLUTION)
+/VIEW,1,1,1,1                                                                  ! seta a vista isométrica
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLNSOL,NL,SRAT,1,                                                              ! solução nodal, taxa de estado de tensão, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura com tensões equivalentes de Von Mises (ELEMENT SOLUTION)
+/VIEW,1, , ,1                                                                  ! seta vista no plano XY
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLESOL,S,EQV,1,                                                                ! solução de elemento, tensão equivalente de Von Mises, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura com tensões equivalentes de Von Mises (NODAL SOLUTION)
+/VIEW,1, , ,1                                                                  ! seta vista no plano XY
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLNSOL,S,EQV,1,                                                                ! solução nodal, tensão equivalente de Von Mises, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura com tensões equivalentes de Von Mises (NODAL SOLUTION)
+/VIEW,1, , ,1                                                                  ! seta vista no plano XY
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLNSOL,S,EQV,0,                                                                ! solução nodal, tensão equivalente de Von Mises, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura com tensões equivalentes de Von Mises (ELEMENT SOLUTION)
+/VIEW,1,1,1,1                                                                  ! seta a vista isométrica
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLESOL,S,EQV,1,                                                                ! solução de elemento, tensão equivalente de Von Mises, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura com tensões equivalentes de Von Mises (NODAL SOLUTION)
+/VIEW,1,1,1,1                                                                  ! seta a vista isométrica
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLNSOL,S,EQV,1,                                                                ! solução nodal, tensão equivalente de Von Mises, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+! Gera figura com tensões equivalentes de Von Mises (NODAL SOLUTION)
+/VIEW,1,1,1,1                                                                  ! seta a vista isométrica
+SET, , , , , i, , ,                                                            ! seta o tempo de análise "i" para ilustração dos resultados
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+/CONT,1,9,AUTO                                                                 ! seta intervalo de contornos, janela principal "1", máximo de divisões "9", limites automáticos
+PLNSOL,S,EQV,0,                                                                ! solução nodal, tensão equivalente de Von Mises, configuração indeformada e deformada sobrepostas
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
+*ENDDO
+!-
+
+!+		7.2 GERAÇÃO DE ARQUIVOS DE TEXTO
+
+ALLSEL,ALL
+ CMSEL,S,'ELEMCAT',ELEM                                                        ! seleciona todos os elementos da linha de ancoragem
+ *GET,ELEMCATMIN,ELEM,,NUM,MIN                                                 ! cria um parâmetro "ELEMCATMIN" para retornar o elemento da extremidade inferior
+ ESEL,R,,,ELEMCATMIN                                                           ! seleciona o elemento da extremidade inferior
+ NSLE,S,POS,1                                                                  ! seleciona o nó que representa o apoio fixo
+ SET,LAST                                                                      ! seta o tempo de análise como o final
+ /OUT,REACAO_APOIO,txt                                                             ! cria um arquivo de texto
+ PRRSOL,F
+
+ALLSEL,ALL
+ ESEL,S,TYPE,,4
+ SET,LAST
+  NSLE,S,1                                                                      ! seleciona o nó que representa o apoio fixo
+ /OUT,CONTATO_STATUS,txt
+ PRNSOL,CONT 
+
+ALLSEL,ALL
+ CMSEL,S,'ELEMCAT',ELEM                                                        ! seleciona todos os elementos da linha de ancoragem
+! *GET,ELEMCATMIN,ELEM,,NUM,MIN                                                 ! cria um parâmetro "ELEMCATMIN" para retornar o elemento da extremidade inferior
+! ESEL,R,,,ELEMCATMIN                                                           ! seleciona o elemento da extremidade inferior
+! NSLE,S,1                                                                      ! seleciona o nó que representa o apoio fixo
+ SET,LAST                                                                      ! seta o tempo de análise como o final
+ /OUT,FORCA_NODAL_CABO,txt                                                             ! cria um arquivo de texto
+PRESOL,FORC 
+
+ALLSEL,ALL
+ CMSEL,S,'ELEMCAT',ELEM                                                        ! seleciona todos os elementos da linha de ancoragem
+! *GET,ELEMCATMIN,ELEM,,NUM,MIN                                                 ! cria um parâmetro "ELEMCATMIN" para retornar o elemento da extremidade inferior
+! ESEL,R,,,ELEMCATMIN                                                           ! seleciona o elemento da extremidade inferior
+ NSLE,S,1                                                                      ! seleciona o nó que representa o apoio fixo
+ SET,LAST                                                                      ! seta o tempo de análise como o final
+ /OUT,UX_CABO,txt                                                             ! cria um arquivo de texto
+PRNSOL,U,X
+
+ALLSEL,ALL
+ CMSEL,S,'ELEMCAT',ELEM                                                        ! seleciona todos os elementos da linha de ancoragem
+! *GET,ELEMCATMIN,ELEM,,NUM,MIN                                                 ! cria um parâmetro "ELEMCATMIN" para retornar o elemento da extremidade inferior
+! ESEL,R,,,ELEMCATMIN                                                           ! seleciona o elemento da extremidade inferior
+ NSLE,S,1                                                                      ! seleciona o nó que representa o apoio fixo
+ SET,LAST                                                                      ! seta o tempo de análise como o final
+ /OUT,UY_CABO,txt                                                             ! cria um arquivo de texto
+PRNSOL,U,Y
+
+
+
+
+
+ALLSEL,ALL
+ /STAT,GLOBAL                                                                  ! exibe status da análise 
+! NLIST,ALL, , ,XYZ,NODE,NODE,NODE                                              ! exibe a lista dos nós com coordenadas
+! ELIST,ALL,,,0,0                                                               ! exibe a lista dos elementos e seus nós 
+ /OUT,STATUS_ANALISE,stat                                                             ! cria um arquivo de texto
+
+!-
+
+!-
