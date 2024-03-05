@@ -9,7 +9,8 @@ FINISH                                                                         !
 !-
 !+	1.DADOS DE ENTRADA
 !+		1.0 PRELIMINARES
-LINHAS = 31                                                                    ! define a quantidade de linhas do array "_MODELDATA"
+
+LINHAS = 30                                                                    ! define a quantidade de linhas do array "_MODELDATA"
 COLUNAS = 1                                                                    ! define a quantidade de colunas do array "_MODELDATA"
 PLANOS = 1                                                                     ! define a quantidade de planos do array "_MODELDATA"
 
@@ -18,6 +19,7 @@ PLANOS = 1                                                                     !
 (1F9.0)                                                                        ! necessário para informar o formato dos núm. lidos: 1 linha de cada vez, 9 casas decimais e sem definição da posição do separador decimal
 
 GRAVIDADE = 9.81                                                               ! [m/s²] aceleração da gravidade
+
 !-
 !+		1.1 SOLO
 
@@ -32,22 +34,24 @@ DILAsolo     = ((_MODELDATA(7))*3.14159/180)                                   !
 Ko           = _MODELDATA(8)                                                   ! [-] coef. de empuxo do solo em repouso
 
 ! Os parâmetros abaixo são atribuídos para a aplicação do critério de Drucker-Prager Estendido (EDP) no ANSYS
+
 alphaps      = (6*sin(ATRIsolo))/(3-sin(ATRIsolo))                             ! [-] parâmetro de sensibilidade à pressão, utilizado para critério de escoamento
 alphabarraps = alphaps                                                         ! [-] parâmetro de sensibilidade à pressão, utilizado para potencial plástico
 SescMAX      = (6*CsoloMAX*cos(ATRIsolo))/((3-sin(ATRIsolo)))                  ! [kN/m²] tensão de escoamento unixial na profundidade máxima modelada
 
 ! Os parâmetros abaixo servem para controlar a variação do módulo de elasticidade e da tensão de escoamento ao longo da profundidade (em termos percentuais)
-Esoloini     = _MODELDATA (9)
-Sescini      = _MODELDATA (10)
+
+Esoloini     = _MODELDATA (9)                                                  ! [-] parcela a ser considerada para módulo de elasticidade na superfície do maciço, de acordo com as características do problema
+Sescini      = _MODELDATA (10)                                                 ! [-] parcela a ser considerada para tensão de escoamento na superfície do maciço, de acordo com as características do problema
 
 !-
 !+		1.2 LINHA
 
-Dlinha       = _MODELDATA(11)                                                ! [m] diâmetro equivalente da linha de ancoragem, considerando condição de simetria
-Alinha       = (((3.14159)*(Dlinha)**2)/4)/2                                   ! [m²] área da seção transversal equivalente da linha de ancoragem
+Dlinha       = _MODELDATA(11)                                                  ! [m] diâmetro equivalente da linha de ancoragem
+Alinha       = (((3.14159)*(Dlinha)**2)/4)/2                                   ! [m²] área da seção transversal equivalente da linha de ancoragem, considerando condição de simetria
 Elinha       = _MODELDATA(12)                                                  ! [kN/m²] módulo de elasticidade da linha de ancoragem
 NUlinha      = _MODELDATA(13)                                                  ! [-] coef. de Poisson da linha de ancoragem
-GAMMAlinha   = _MODELDATA(14)                                                  ! [kN/m³] peso específico do aço
+GAMMAlinha   = _MODELDATA(14)                                                  ! [kN/m³] peso específico do material da linha de ancoragem
 
 !-
 !+		1.3 INTERFACE SOLO-CORRENTE
@@ -59,8 +63,8 @@ FKT          = _MODELDATA(17)                                                  !
 !-
 !+		1.4 PARÂMETROS DE MALHA
 
-discretsolo  = _MODELDATA(18)                                                  ! define o tamanho dos elementos que comporão a linha de ancoragem e, consequentemente, os contatos
-discretlinha = _MODELDATA(19)                                                  ! define o tamanho dos elementos que comporão o maciço de solo e, consequentemente, os alvos
+discretsolo  = _MODELDATA(18)                                                  ! define o tamanho dos elementos que irão compor a linha de ancoragem e, consequentemente, os contatos
+discretlinha = _MODELDATA(19)                                                  ! define o tamanho dos elementos que irão compor o maciço de solo e, consequentemente, os alvos
 
 !-
 !+		1.5 GEOMETRIA
@@ -87,7 +91,7 @@ Zmac1         = _MODELDATA(25)                                                 !
 Zmac2         = _MODELDATA(26)                                                 ! define a coordenada Z final para o maciço de solo ("2º vértice")
 
 !-
-!+			1.5.3 DESLOCAMENTO DA EXTREMIDADE FIXADA DA LINHA
+!+			1.5.3 DESLOCAMENTO DA EXTREMIDADE INFERIOR DA LINHA DE ANCORAGEM
 
 DESLOCAx      = _MODELDATA(27)                                                 ! define o deslocamento X a ser incorporado na extremidade fixa da linha de ancoragem, par afastar condições de contorno
 DESLOCAy      = _MODELDATA(28)                                                 ! define o deslocamento Y a ser incorporado na extremidade fixa da linha de ancoragem, par afastar condições de contorno
@@ -96,12 +100,10 @@ DESLOCAy      = _MODELDATA(28)                                                 !
 !+		1.6 CARGAS OU DESLOCAMENTOS APLICADOS
 
 Hagua         = _MODELDATA(29)                                                 ! [m] altura da coluna d'água acima do leito marinho
-
-! Permite que seja aplicado força ou deslocamento, de acordo com a característica do problema
-Flinha        = _MODELDATA(30)                                                 ! [kN] amplitude da força aplicada na linha
-Daplic        = _MODELDATA(30)                                                 ! [m] deslocamento aplicado na extremidade da linha
+Flinha        = _MODELDATA(30)/2                                               ! [kN] amplitude da força aplicada na linha, considerando condição de simetria
 
 ! Sequência para determinar o ângulo de aplicação de carga, alinhado ao último segmento de linha
+
 HIPOTENUSA    = ((_XDATA(npontos)-_XDATA(npontos-1))**2+((_YDATA(npontos)-_YDATA(npontos-1))**2))**.5
 CATETOADJ     = _XDATA(npontos)-_XDATA(npontos-1)
 CATETOOPO     = _YDATA(npontos)-_YDATA(npontos-1)
@@ -110,14 +112,15 @@ TANGANG       = CATETOOPO/CATETOADJ
 Fang = atan(TANGANG)                                                           ! [rad] ângulo de aplicação da força
 Fhoriz        = Flinha*cos(Fang)                                               ! [kN] componente x de força na linha
 Fvert         = Flinha*sin(Fang)                                               ! [kN] componente y de força na linha
-divtime       = _MODELDATA(31)                                                 ! [-] número de parcelas de carga ou deslocamento a serem aplicadas até chegar ao total
 
 !-
 !-
 !-
 !+	2.ETAPA DE PRÉ-PROCESSAMENTO
 !+		2.0 PRELIMINARES
+
 /PREP7                                                                         ! inicia o pré-processador
+
 !-
 !+		2.1 MODELO GEOMÉTRICO DOS ELEMENTO
 !+			2.1.1 CORRENTE
@@ -135,7 +138,7 @@ ALLSEL,ALL
 ! Cria um grupo com todas as LINES que representam a linha para procedimentos posteriores
 ALLSEL,ALL
  LSEL,ALL
- CM,'LINHASCAT',LINE                                                           
+ CM,'LINHASCAT',LINE                                                           ! atribui nomenclatura "LINHASCAT" ao grupo
 
 ALLSEL,ALL
  CMSEL,R,'LINHASCAT',LINE                                                      ! seleciona as LINES que representam a linha
@@ -148,12 +151,8 @@ ALLSEL,ALL
 DIVy = (Ymac2)/(discretsolo)
 
 *DO,i,1,DIVy,1                                                                 ! inicia loop para lançar os VOLUMES de solo
- BLOCK,Xmac1,Xmac2,Ymac2*((i-1)/DIVy),Ymac2*(i/DIVy),Zmac1,Zmac2/2,              ! lança os VOLUMES de acordo com os pontos chaves definidos na entrada de dados e com o particionamento vertical
+ BLOCK,Xmac1,Xmac2,Ymac2*((i-1)/DIVy),Ymac2*(i/DIVy),Zmac1,Zmac2/2,            ! lança os VOLUMES de acordo com os pontos chaves definidos na entrada de dados e com o particionamento vertical
 *ENDDO                                                                         ! encerra loop para lançar VOLUMES de solo
-
-!*DO,i,1,DIVy,1                                                                 ! inicia loop para lançar os VOLUMES de solo
-! BLOCK,Xmac1,Xmac2,Ymac2*((i-1)/DIVy),Ymac2*(i/DIVy),Zmac2/2,Zmac2,              ! lança os VOLUMES de acordo com os pontos chaves definidos na entrada de dados e com o particionamento vertical
-!*ENDDO                                                                         ! encerra loop para lançar VOLUMES de solo
 
 ALLSEL,ALL
 VGLUE,ALL                                                                      ! aglutina volumes para continuidade na geração da malha
@@ -211,7 +210,7 @@ MPTEMP,1,
 
 MPDATA,EX,MATLINHA,,Elinha                                                     ! associa o módulo de elasticidade da linha de ancoragem
 MPDATA,PRXY,MATLINHA,,NUlinha                                                  ! associa o coeficiente de Poisson da linha de ancoragem
-MPDATA,DENS,MATLINHA,,GAMMAlinha/GRAVIDADE                                     ! associa a densidade do material à linha de ancoragem
+MPDATA,DENS,MATLINHA,,GAMMAlinha/GRAVIDADE                                     ! associa a densidade do material da linha de ancoragem
 
 ALLSEL,ALL
  CMSEL,R,'LINHASCAT',LINE                                                      ! seleciona as LINES que representam a linha
@@ -222,7 +221,7 @@ ALLSEL,ALL
 ! Cria um grupo com todos os elementos que representam linha de ancoragem
 ALLSEL,ALL
  ESEL,S,TYPE,,2
- CM,'ELEMCAT',ELEM
+ CM,'ELEMCAT',ELEM                                                             ! atribui nomenclatura "ELEMCAT" ao grupo
 
 !-
 !+			2.2.3 INTERFACE DE CONTATO
@@ -233,34 +232,31 @@ MATINTERF = MATLINHA + 1                                                       !
 MP,MU,MATINTERF,FRIC                                                           ! estabelece o coeficiente de atrito para o nó superior
 MAT,MATINTERF                                                                  ! estabelece o material para malha
 R,MATINTERF                                                                    ! estabelece a identificação das constantes reais
-REAL,MATINTERF                                                                 !
+REAL,MATINTERF
 ET,3,TARGE170                                                                  ! declara o elemento alvo
 ET,4,CONTA175                                                                  ! declara o elemento de contato
 
 ! Sequência de opções chave que podem ser alteradas no elemento de contato
-!KEYOPT,4, 1,0                                                                 ! Degrees of freedom (0: UX, UY, UZ)
-!KEYOPT,4, 2,0                                                                 ! Contact algorithm (0: Augmented Lagrangian (default))
+KEYOPT,4, 1,0                                                                  ! Degrees of freedom (0: UX, UY, UZ)
+KEYOPT,4, 2,0                                                                  ! Contact algorithm (0: Augmented Lagrangian (default))
 KEYOPT,4, 3,1                                                                  ! Contact model (0: Contact force-based model (default), 1: Contact traction-based model)
-!KEYOPT,4, 4,0                                                                 ! Contact normal direction (0: Normal to target surface (default))
-!KEYOPT,4, 5,0                                                                 ! CNOF/ICONT Automated adjustment (0: No automated adjustment, 1: Close gap with auto CNOF, 2: Reduce penetration with auto CNOF, 3: Close gap/reduce penetration with auto CNOF, 4: Auto ICONT)
-!KEYOPT,4, 6,0                                                                 ! Contact stiffness variation (0: Use default range for stiffness updating)
-!KEYOPT,4, 7,0                                                                 ! Element level time incrementation control / impact constraints (0: No control)
-!KEYOPT,4, 8,0                                                                 ! Symmetric contact behavior (0: Both symmetric pairs are active. However, each pair has its own contact characteristics)
-!KEYOPT,4, 9,0                                                                 ! Effect of initial penetration or gap (0: Include both initial geometrical penetration or gap and offset, 1: Exclude both initial geometrical penetration or gap and offset, 2: Include both initial geometrical penetration or gap and offset, but with ramped effects, 3: Include offset only (exclude initial geometrical penetration or gap), 4: Include offset only (exclude initial geometrical penetration or gap), but with ramped effects, 5: Include offset only (exclude initial geometrical penetration or gap) regardless of the initial contact status (near-field or closed), 6: Include offset only (exclude initial geometrical penetration or gap), but with ramped effects regardless of the initial contact status (near-field or closed))
-!KEYOPT,4,10,0                                                                 ! Contact Stiffness Update (0: Each iteration based on the current mean stress of underlying elements. The actual elastic slip never exceeds the maximum allowable limit (SLTO) during the entire solution.)
-!KEYOPT,4,11,0                                                                 ! Shell Thickness Effect (0: Exclude)
+KEYOPT,4, 4,0                                                                  ! Contact normal direction (0: Normal to target surface (default))
+KEYOPT,4, 5,0                                                                  ! CNOF/ICONT Automated adjustment (0: No automated adjustment, 1: Close gap with auto CNOF, 2: Reduce penetration with auto CNOF, 3: Close gap/reduce penetration with auto CNOF, 4: Auto ICONT)
+KEYOPT,4, 6,0                                                                  ! Contact stiffness variation (0: Use default range for stiffness updating)
+KEYOPT,4, 7,0                                                                  ! Element level time incrementation control / impact constraints (0: No control)
+KEYOPT,4, 8,0                                                                  ! Symmetric contact behavior (0: Both symmetric pairs are active. However, each pair has its own contact characteristics)
+KEYOPT,4, 9,0                                                                  ! Effect of initial penetration or gap (0: Include both initial geometrical penetration or gap and offset, 1: Exclude both initial geometrical penetration or gap and offset, 2: Include both initial geometrical penetration or gap and offset, but with ramped effects, 3: Include offset only (exclude initial geometrical penetration or gap), 4: Include offset only (exclude initial geometrical penetration or gap), but with ramped effects, 5: Include offset only (exclude initial geometrical penetration or gap) regardless of the initial contact status (near-field or closed), 6: Include offset only (exclude initial geometrical penetration or gap), but with ramped effects regardless of the initial contact status (near-field or closed))
+KEYOPT,4,10,0                                                                  ! Contact Stiffness Update (0: Each iteration based on the current mean stress of underlying elements. The actual elastic slip never exceeds the maximum allowable limit (SLTO) during the entire solution.)
+KEYOPT,4,11,0                                                                  ! Shell Thickness Effect (0: Exclude)
 KEYOPT,4,12,2                                                                  ! Behavior of contact surface (0: Standard, 1: Rough, 2: No separation (sliding permitted), 3: Bonded, 4: No separation (always), 5: Bonded (always), 6: Bonded (initial contact))
-!KEYOPT,4,15,0                                                                 ! Effect of contact stabilization damping (0: Damping is activated only in the first load step (default)
-!KEYOPT,4,16,0                                                                 ! Squeal damping controls for interpretation of real constants FDMD and FDMS (0: FDMD and FDMS are scaling factors for destabilizing and stabilizing damping (default).)
-!KEYOPT,4,18,0                                                                 ! Sliding behavior (0: Finite sliding (default). The contacting interface can undergo separation, relative large sliding, and arbitrary rotation)
+KEYOPT,4,15,0                                                                  ! Effect of contact stabilization damping (0: Damping is activated only in the first load step (default)
+KEYOPT,4,16,0                                                                  ! Squeal damping controls for interpretation of real constants FDMD and FDMS (0: FDMD and FDMS are scaling factors for destabilizing and stabilizing damping (default).)
+KEYOPT,4,18,0                                                                  ! Sliding behavior (0: Finite sliding (default). The contacting interface can undergo separation, relative large sliding, and arbitrary rotation)
 
 ! Sequência de constantes reais que podem ser alteradas no elemento alvo
 RMODIF,MATINTERF, 3,FKN                                                        ! Normal penalty stiffness factor
-!RMODIF,MATINTERF, 5,-.5                                                       ! Initial contact closure
-!RMODIF,MATINTERF, 9,Su                                                        ! Maximum friction stress
 RMODIF,MATINTERF,10,1E-9                                                       ! Contact surface offset
 RMODIF,MATINTERF,12,FKT                                                        ! Tangent penalty stiffness factor
-!RMODIF,MATINTERF,13,0                                                         ! Contact cohesion
 
 ALLSEL,ALL
  TYPE,3                                                                        ! estabelece que será utilizado o elemento finito identificado como "3" (TARGE)
@@ -269,19 +265,11 @@ ALLSEL,ALL
  NSEL,R,LOC,Z,Zmac2/2                                                          ! reseleciona os nós dos elementos de solo posicionados na coordenada Ymac2 (limite do maciço)
  ESURF                                                                         ! cria os elementos alvo com base nos elementos de solo selecionados
 
-!ALLSEL,ALL
-! TYPE,3                                                                        ! estabelece que será utilizado o elemento finito identificado como "3" (TARGE)
-! ESEL,R, TYPE,,1                                                               ! seleciona somente os elementos de solo
-! ESEL,R,CENT,Z,Zmac2/2+discretsolo/2                                           ! seleciona os elementos de solo que se encontram adjacentes ao plano da linha de ancoragem
-! ESURF                                                                         ! cria os elementos alvo com base nos elementos de solo selecionados
-
 ALLSEL,ALL
  TYPE,4                                                                        ! estabelece que será utilizado o elemento finito identificado como "4" (CONTA)
  CMSEL,R,'ELEMCAT',ELEM                                                        ! seleciona os elementos atribuídos para a linha de ancoragem
  NSLE,S,1                                                                      ! seleciona os nós referentes aos elementos da linha de ancoragem
  ESURF                                                                         ! cria os elementos de contato com base nos nós da linha de ancoragem
-
-!CNCHECK,ADJUST                                                                ! ajusta o estabelecimento do contato, retirando eventuais espaçamentos ou penetrações indesejadas
 
 !-
 !-
@@ -302,13 +290,15 @@ SIGMAh = SIGMAv*Ko                                                             !
 ALLSEL,ALL
  ACEL,,GRAVIDADE,                                                              ! ativa a aceleração da gravidade, somente na direção Y
 
+! Sequência de comandos que definem a condição inicial em termos de tensões que variam de acordo com uma determinada função
 ALLSEL,ALL
  ESEL,R,TYPE,,1                                                                ! reseleciona somente os elementos de solo
- INISTATE,SET,DATA,FUNC                                                        ! 
- INISTATE,SET,DTYP,S                                                           !
+ INISTATE,SET,DATA,FUNC
+ INISTATE,SET,DTYP,S
 
-!
+! Define a variação das tensões de acordo com a coordenada Y (vertical), com especificação da tensão total na base que progressivamente reduz até a superfície
  INISTATE,DEFINE,ALL,ALL,,,LINY,SIGMAh,GAMMAsolo,SIGMAv,GAMMAsolo,SIGMAh,GAMMAsolo,0,0,0
+ 
 !-
 !-
 !+	4.CONDIÇÕES DE CONTORNO
@@ -333,9 +323,8 @@ ALLSEL,ALL
   D,ALL,ALL,0                                                                  ! restringe todos os graus de liberdade para os nós selecionados
 
 ALLSEL,ALL
- NSEL,R,LOC,Z,Zmac2/2                                                            ! seleciona os nós posicionados na coordenada Zmac2 (limite do maciço)
-DSYM,SYMM,Z, 
-
+ NSEL,R,LOC,Z,Zmac2/2                                                          ! seleciona os nós posicionados na coordenada Zmac2 (limite do maciço)
+DSYM,SYMM,Z,                                                                   ! atribui condição de simetria em relação ao eixo Z para os nós selecionados
 
 !-
 
@@ -417,7 +406,7 @@ ALLSEL,ALL
 ! Sequência de comandos para aplicação da carga em um número estipulado de divisões (permite uma melhor avaliação do que ocorre ao longo das parcelas de aplicação da carga)
 ALLSEL,ALL
  TIME,2                                                                        ! define o passo de carga para a situação de aplicação da carga na extremidade superior
- DELTIM,1E-12,1E-24,.1                                                          ! passo inicial de aplicação de carga, passo mínimo de aplicação de carga, passo máximo de aplicação de carga
+ DELTIM,1E-12,1E-24,.1                                                         ! passo inicial de aplicação de carga, passo mínimo de aplicação de carga, passo máximo de aplicação de carga
  AUTOTS,ON                                                                     ! permite que o programa adpate cada passo de carga de acordo com os limites estabelecidos
  NEQIT,100                                                                     ! estipula um número máximo de 100 iterações para busca de convergência, caso contrário admite-se que não foi encontrada solução
  OUTRES,ERASE                                                                  ! reseta as especificações sobre dados de saída
@@ -429,12 +418,8 @@ ALLSEL,ALL
  ESEL,R,,,ELEMCATMAX                                                           ! seleciona somente o elemento localizado na extremidade superior
  NSLE,S,POS,2                                                                  ! seleciona o nó superior do elemento (ponto de embutimento)
 
-! Estratégia temporária, vou ver se consigo confirmar cada parcela de carga aplicada em cada divisão de tempo
-Fh = (Fhoriz/1)*(1)
-Fv = (Fvert/1)*(1)
-
- F,ALL,FX,Fh                                                                   ! aplica a parcela de força horizontal na extremidade superior
- F,ALL,FY,Fv                                                                   ! aplica a parcela de força vertical na extremidade superior
+ F,ALL,FX,Fhoriz                                                               ! aplica a parcela de força horizontal na extremidade superior
+ F,ALL,FY,Fvert                                                                ! aplica a parcela de força vertical na extremidade superior
 
 ! Sequência de comandos que possibilita alterar os critérios de convergência para a segunda etapa de solução
 FORTOL2=1                                                                      ! define um multiplicador para ajustar o critério de convergência para força (valor unitário não impõe alterações)
@@ -445,8 +430,6 @@ CNVTOL,U,,DESTOL2*(.05),,0                                                     !
 ALLSEL,ALL
  SOLVE                                                                         ! solução do modelo
  FINISH                                                                        ! encerra a etapa de solução
- 
- 
 
 !-
 !-
@@ -465,16 +448,14 @@ JPEG,QUAL,100,                                                                 !
 JPEG,ORIENT,HORIZ                                                              ! define a orientação do JPEG como horizontal
 JPEG,COLOR,2                                                                   ! define a impressão do JPEG como colorida
 JPEG,TMOD,1                                                                    ! define o formato de texto como padrão
-/GFILE,1800                                                                    !
+/GFILE,1800                                                                    ! define DPI da imagem
 
-*DO,i,1,divtime+1,1                                                            ! sequência de comandos para geração de imagens em cada "passo de carga"
+*DO,i,1,2,1                                                                    ! sequência de comandos para geração de imagens em cada "passo de carga"
 
 ALLSEL,ALL
-! ESEL,U,TYPE,,2                                                                ! retira da seleção os elementos da linha de ancoragem
  ESEL,R,CENT,Z,Zmac1,Zmac2/2                                                   ! seleciona somente a metade anterior do maciço, possibilitando ver o plano onde se localiza a catenária
 
-/EFACET,2   
-
+/EFACET,2                                                                      ! aprimora gráficos de contornos
 
 ! Gera figura de deslocamentos em X em todo o modelo (NODAL SOLUTION)
 /VIEW,1,1,1,1                                                                  ! seta a vista isométrica
@@ -637,6 +618,20 @@ PLNSOL,S,EQV,0,                                                                !
 /SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
 
 *ENDDO
+
+! Sequência de comandos para gerar figura isométrica do modelo
+/PNUM,TYPE,0
+/NUMBER,0
+
+ALLSEL,ALL
+ ESEL,R,CENT,Z,Zmac1,Zmac2/2                                                   ! seleciona somente a metade anterior do maciço, possibilitando ver o plano onde se localiza a catenária
+
+/VIEW,1,1,1,1                                                                  ! seta a vista isométrica
+/SHOW,JPEG                                                                     ! abre o comando de geração da imagem
+ALLSEL,ALL
+EPLOT
+/SHOW,CLOSE                                                                    ! fecha o comando de geração da imagem
+
 !-
 
 !+		7.2 GERAÇÃO DE ARQUIVOS DE TEXTO
@@ -647,53 +642,19 @@ ALLSEL,ALL
  ESEL,R,,,ELEMCATMIN                                                           ! seleciona o elemento da extremidade inferior
  NSLE,S,POS,1                                                                  ! seleciona o nó que representa o apoio fixo
  SET,LAST                                                                      ! seta o tempo de análise como o final
- /OUT,REACAO_APOIO,txt                                                             ! cria um arquivo de texto
+ /OUT,REACAO_APOIO,txt                                                         ! cria um arquivo de texto com as reações no ponto de ancoragem
  PRRSOL,F
 
 ALLSEL,ALL
- ESEL,S,TYPE,,4
- SET,LAST
-  NSLE,S,1                                                                      ! seleciona o nó que representa o apoio fixo
- /OUT,CONTATO_STATUS,txt
- PRNSOL,CONT 
-
-ALLSEL,ALL
- CMSEL,S,'ELEMCAT',ELEM                                                        ! seleciona todos os elementos da linha de ancoragem
-! *GET,ELEMCATMIN,ELEM,,NUM,MIN                                                 ! cria um parâmetro "ELEMCATMIN" para retornar o elemento da extremidade inferior
-! ESEL,R,,,ELEMCATMIN                                                           ! seleciona o elemento da extremidade inferior
-! NSLE,S,1                                                                      ! seleciona o nó que representa o apoio fixo
+ ESEL,S,TYPE,,4                                                                ! seleciona todos os elementos de contato 
  SET,LAST                                                                      ! seta o tempo de análise como o final
- /OUT,FORCA_NODAL_CABO,txt                                                             ! cria um arquivo de texto
-PRESOL,FORC 
-
-ALLSEL,ALL
- CMSEL,S,'ELEMCAT',ELEM                                                        ! seleciona todos os elementos da linha de ancoragem
-! *GET,ELEMCATMIN,ELEM,,NUM,MIN                                                 ! cria um parâmetro "ELEMCATMIN" para retornar o elemento da extremidade inferior
-! ESEL,R,,,ELEMCATMIN                                                           ! seleciona o elemento da extremidade inferior
- NSLE,S,1                                                                      ! seleciona o nó que representa o apoio fixo
- SET,LAST                                                                      ! seta o tempo de análise como o final
- /OUT,UX_CABO,txt                                                             ! cria um arquivo de texto
-PRNSOL,U,X
-
-ALLSEL,ALL
- CMSEL,S,'ELEMCAT',ELEM                                                        ! seleciona todos os elementos da linha de ancoragem
-! *GET,ELEMCATMIN,ELEM,,NUM,MIN                                                 ! cria um parâmetro "ELEMCATMIN" para retornar o elemento da extremidade inferior
-! ESEL,R,,,ELEMCATMIN                                                           ! seleciona o elemento da extremidade inferior
- NSLE,S,1                                                                      ! seleciona o nó que representa o apoio fixo
- SET,LAST                                                                      ! seta o tempo de análise como o final
- /OUT,UY_CABO,txt                                                             ! cria um arquivo de texto
-PRNSOL,U,Y
-
-
-
-
+  NSLE,S,1                                                                     ! seleciona o nó que representa o apoio fixo
+ /OUT,CONTATO_STATUS,txt                                                       ! cria um arquivo de texto com as informações sobre o contato estebelecido
+ PRNSOL,CONT
 
 ALLSEL,ALL
  /STAT,GLOBAL                                                                  ! exibe status da análise 
-! NLIST,ALL, , ,XYZ,NODE,NODE,NODE                                              ! exibe a lista dos nós com coordenadas
-! ELIST,ALL,,,0,0                                                               ! exibe a lista dos elementos e seus nós 
- /OUT,STATUS_ANALISE,stat                                                             ! cria um arquivo de texto
-
+ /OUT,STATUS_ANALISE,stat                                                      ! cria um arquivo de texto com informações sobre a análise
+ 
 !-
-
 !-
